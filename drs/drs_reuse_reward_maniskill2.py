@@ -103,7 +103,7 @@ from mani_skill2.utils.wrappers import RecordEpisode
 
 def make_env(env_id, seed, control_mode=None, video_dir=None, **kwargs):
     def thunk():
-        env = gym.make(env_id, reward_mode='sparse', control_mode=control_mode,
+        env = gym.make(env_id, reward_mode='semi_sparse', control_mode=control_mode,
                 render_mode='cameras' if video_dir else None, **kwargs)
         if video_dir:
             env = RecordEpisode(env, output_dir=video_dir, save_trajectory=False, info_on_video=True)
@@ -341,7 +341,7 @@ if __name__ == "__main__":
 
             # TRY NOT TO MODIFY: execute the game and log data.
             next_obs, rewards, terminations, truncations, infos = envs.step(actions)
-            rewards = success_rewards = terminations.astype(rewards.dtype)
+            success_rewards = terminations.astype(rewards.dtype)
 
             # TRY NOT TO MODIFY: record rewards for plotting purposes
             result = collect_episode_info(infos, result)
@@ -372,7 +372,7 @@ if __name__ == "__main__":
             # Train agent
             #############################################
             # compute reward by discriminator
-            disc_rewards = disc.get_reward(data.next_observations, data.rewards)
+            disc_rewards = disc.get_reward(data.next_observations, data.rewards, data.dones)
 
             # update the value networks
             with torch.no_grad():

@@ -109,7 +109,7 @@ from mani_skill2.utils.wrappers import RecordEpisode
 
 def make_env(env_id, seed, control_mode=None, video_dir=None, **kwargs):
     def thunk():
-        env = gym.make(env_id, reward_mode='sparse', control_mode=control_mode,
+        env = gym.make(env_id, reward_mode='semi_sparse', control_mode=control_mode,
                        render_mode='cameras' if video_dir else None, **kwargs)
         if video_dir:
             env = RecordEpisode(env, output_dir=video_dir, save_trajectory=False, info_on_video=True)
@@ -220,16 +220,15 @@ class Discriminator(nn.Module):
         net = self.nets[stage_idx]
         return net(next_s)
 
-    def get_reward(self, next_s, success):
+    def get_reward(self, next_s, stage_idx, success):
         with torch.no_grad():
             bs = next_s.shape[0]
+            stage_idx = stage_idx.squeeze(-1)
             if not torch.is_tensor(success):
                 success = torch.tensor(success, device=next_s.device)
                 success = success.reshape(bs, 1)
-            if self.n_stages > 1:
-                stage_idx = torch.cat([next_s[:, -(self.n_stages-1):], success], dim=1).sum(dim=1)
-            else:
-                stage_idx = success.squeeze(-1)
+            if self.n_stages == 1:
+                assert stage_idx == success.squeeze(-1)
             
             stage_rewards = [
                 torch.tanh(self(next_s, stage_idx=i)) if self.trained[i] else torch.zeros(bs, 1, device=next_s.device)
@@ -239,8 +238,8 @@ class Discriminator(nn.Module):
             k = 3
             reward = k * stage_idx + stage_rewards[torch.arange(bs), stage_idx.long()]
             reward = reward / (k * self.n_stages) # reward is in (0, 1]
-            #reward = reward - 2 # make the reward negative
-            reward = reward + 1 # make the reward positive
+            reward = reward - 2 # make the reward negative
+            #reward = reward + 1 # make the reward positive
 
             return reward
 
@@ -468,7 +467,7 @@ if __name__ == "__main__":
 
             # TRY NOT TO MODIFY: execute the game and log data.
             next_obs, rewards, terminations, truncations, infos = envs.step(actions)
-            rewards = success_rewards = terminations.astype(rewards.dtype)
+            success_rewards = terminations.astype(rewards.dtype)
 
             # TRY NOT TO MODIFY: record rewards for plotting purposes
             result = collect_episode_info(infos, result)
@@ -553,7 +552,7 @@ if __name__ == "__main__":
             #############################################
             
             # compute reward by discriminator
-            disc_rewards = disc.get_reward(data.next_observations, data.rewards)
+            disc_rewards = disc.get_reward(data.next_observations, data.rewards, data.dones)
 
             # update the value networks
             with torch.no_grad():
