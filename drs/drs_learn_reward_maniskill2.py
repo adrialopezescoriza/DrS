@@ -439,6 +439,7 @@ if __name__ == "__main__":
     del tmp_env
     assert args.learning_starts > args.num_envs * max_t, "learning_starts must be larger than num_envs * max_ep_steps"
     episode_next_obs = np.zeros((args.num_envs, max_t) + envs.single_observation_space.shape)
+    episode_rewards = np.zeros((args.num_envs, max_t,1))
     step_in_episodes = np.zeros((args.num_envs,1,1), dtype=np.int32)
 
     # TRY NOT TO MODIFY: start the game
@@ -484,6 +485,7 @@ if __name__ == "__main__":
 
             # DrS pecific: record data for the current episode, add data to stage buffers
             np.put_along_axis(episode_next_obs, step_in_episodes, values=real_next_obs[:, None, :], axis=1)
+            np.put_along_axis(episode_rewards, step_in_episodes, values=rewards[:, None, None], axis=1)
             step_in_episodes += 1
 
             for i, d in enumerate(terminations | truncations):
@@ -494,7 +496,7 @@ if __name__ == "__main__":
                     if infos["final_info"][i]['success']:
                         stage_idx = args.n_stages
                     elif args.n_stages > 1:
-                        stage_indices = traj[:, -(args.n_stages-1):].sum(axis=1)
+                        stage_indices = episode_rewards[i, :l]
                         best_step = l -1 - np.argmax(stage_indices[::-1])
                         stage_idx = int(stage_indices[best_step])
                         traj = traj[:best_step+1]
